@@ -1,0 +1,136 @@
+                              ################################################## 
+                                       # Technology part of the CPF # 
+                              ################################################## 
+set_hierarchy_separator /
+set_power_unit uW
+
+#######################################################
+set LIB_DIR "cg_cell"
+set SDC_DIR "constraints/mmmc"
+####################################################### 
+
+# Specify libraries #
+define_library_set -name lib_wc -libraries "$LIB_DIR/LowPowerOpenCellLibrary_slow_ecsm.lib
+                                            $LIB_DIR/NangateOpenCellLibrary_slow_ecsm.lib"
+# Specify special cells # 
+## Isolation Cells ## 
+define_isolation_cell -cells "ISO_FENCE0N_X*" -enable EN -valid_location to 
+
+## Power Switch Cells ## 
+define_power_switch_cell -cells  "HEADER_X*" -power VDD -power_switchable VVDD -type header -stage_1_enable SLEEP
+
+## Retention Cells ## 
+define_state_retention_cell -cells  "DFFR_X*" -restore_function RN
+                       
+## Always ON Cells ## 
+define_always_on_cell -cells "AON_BUF_X*"
+
+                          ################################################## 
+                                          # Design part of the CPF # 
+                          ################################################## 
+set_design topmodule_rtl 
+
+# Declare power/ground nets # 
+create_power_nets -nets TVDD -voltage 0.95 
+create_power_nets -nets VDD -internal
+create_ground_nets -nets VSS -voltage 0
+
+# Specify power domains # 
+create_power_domain -name PD_default -default 
+create_power_domain -name PD_xbus_hw_idct_rtl  -instances {XLXI_3} -shutoff_condition {!XLXI_2/pse} 
+                                     
+# Nominal operating conditions # 
+create_nominal_condition -name off -voltage 0 
+create_nominal_condition -name on -voltage 0.95 
+
+#  Modes of operation # 
+create_power_mode -name PM1 -domain_conditions {PD_default@on  PD_xbus_hw_idct_rtl@on} -default
+create_power_mode -name PM2 -domain_conditions {PD_default@on  PD_xbus_hw_idct_rtl@off}
+
+# Design rules # 
+## Isolation rule ## 
+create_isolation_rule -name iso1 -from PD_xbus_hw_idct_rtl -to PD_default -isolation_condition {XLXI_2/iso_en} -isolation_output low -isolation_target from
+
+## Power switch rule ## 
+create_power_switch_rule -name psr1 -domain PD_xbus_hw_idct_rtl -external_power_net TVDD
+
+## State retention rule ## 
+create_state_retention_rule -name st1 -domain PD_xbus_hw_idct_rtl -restore_edge {!XLXI_2/ret_en}
+
+                                   ################################################## 
+                                                   # Update libraries # 
+                                   ################################################## 
+
+# Associate library sets with nominal conditions # 
+update_nominal_condition -name on -library_set lib_wc
+
+# Update isolation the rules # 
+# update_isolation_rules -names iso1 -location to -cells { ISO_FENCE0N_X1 ISO_FENCE0N_X2 ISO_FENCE0N_X4 }
+update_isolation_rules -names iso1 -cells { ISO_FENCE0N_X1 ISO_FENCE0N_X2 ISO_FENCE0N_X4 }
+
+# Update powerswitch rules # 
+update_power_switch_rule -name psr1 -prefix CPF_PS_ -cells { HEADER_X1 HEADER_X2 HEADER_X4 }
+
+# Specify timing constraints # 
+update_power_mode -name PM1 -sdc_files $SDC_DIR/idct.sdc 
+# update_power_mode -name PM1 -activity_file $SDC_DIR/dut_XLXI3.tcf -activity_file_weight 100
+
+# Describing power nets # 
+create_global_connection -domain PD_default -net TVDD -pins VDD 
+create_global_connection -domain PD_default -net VSS -pins VSS  
+create_global_connection -domain PD_xbus_hw_idct_rtl  -net VDD -pins VDD 
+create_global_connection -domain PD_xbus_hw_idct_rtl -net VSS -pins VSS
+
+# update Power Domain # 
+update_power_domain -name PD_default -internal_power_net TVDD 
+update_power_domain -name PD_xbus_hw_idct_rtl -internal_power_net VDD 
+
+end_design 
+
+# END # 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
