@@ -1,0 +1,147 @@
+                              ################################################## 
+                                       # Technology part of the CPF # 
+                              ################################################## 
+set_hierarchy_separator /
+set_power_unit uW
+
+#######################################################
+set LIB_DIR "/tools/techlibs/nangate/NangateOpenCellLibrary_PDKv1_3_v2010_12"
+set SDC_DIR "constraints/mmmc"
+####################################################### 
+
+# Specify libraries #
+define_library_set -name lib_wc -libraries "$LIB_DIR/Low_Power/Front_End/Liberty/ECSM/LowPowerOpenCellLibrary_slow_ecsm.lib
+                                            $LIB_DIR/Front_End/Liberty/ECSM/NangateOpenCellLibrary_slow_ecsm.lib"
+# Specify special cells # 
+## Isolation Cells ## 
+define_isolation_cell -cells "ISO_FENCE0N_X*" -enable EN -valid_location to 
+
+## Power Switch Cells ## 
+define_power_switch_cell -cells  "HEADER_X*" -power VDD -power_switchable VVDD -type header -stage_1_enable SLEEP
+
+## Retention Cells ## 
+define_state_retention_cell -cells  "DFFR_X*" -restore_function RN
+                       
+## Always ON Cells ## 
+define_always_on_cell -cells "AON_BUF_X*"
+
+                          ################################################## 
+                                          # Design part of the CPF # 
+                          ################################################## 
+set_design Processor_rtl 
+
+# Declare power/ground nets # 
+create_power_nets -nets TVDD -voltage 0.95 
+create_power_nets -nets VDD -internal
+create_ground_nets -nets VSS -voltage 0
+
+# Specify power domains # 
+create_power_domain -name PD_default -default 
+create_power_domain -name PD_mult  -instances {mult} -shutoff_condition {!pwr_ctrl/pse_mult} 
+create_power_domain -name PD_div  -instances {div} -shutoff_condition {!pwr_ctrl/pse_div}
+                                     
+# Nominal operating conditions # 
+create_nominal_condition -name off -voltage 0 
+create_nominal_condition -name on -voltage 0.95 
+
+#  Modes of operation # 
+create_power_mode -name PM1 -domain_conditions {PD_default@on  PD_mult@on	PD_div@on} -default
+create_power_mode -name PM2 -domain_conditions {PD_default@on  PD_mult@off	PD_div@off}
+#create_power_mode -name PM3 -domain_conditions {PD_default@on  PD_mult@on	PD_div@off}
+#create_power_mode -name PM4 -domain_conditions {PD_default@on  PD_mult@off	PD_div@off}
+
+# Design rules # 
+## Isolation rule ## 
+create_isolation_rule -name iso_mult -from PD_mult -to PD_default -isolation_condition {pwr_ctrl/iso_mult} -isolation_output low -isolation_target from
+create_isolation_rule -name iso_div -from PD_div -to PD_default -isolation_condition {pwr_ctrl/iso_div} -isolation_output low -isolation_target from
+
+## Power switch rule ## 
+create_power_switch_rule -name psr_mult -domain PD_mult -external_power_net TVDD
+create_power_switch_rule -name psr_div -domain PD_div -external_power_net TVDD
+
+## State retention rule ## 
+create_state_retention_rule -name str_mult -domain PD_mult -restore_edge {!pwr_ctrl/ret_mult}
+create_state_retention_rule -name str_div -domain PD_div -restore_edge {!pwr_ctrl/ret_div}
+
+                                   ################################################## 
+                                                   # Update libraries # 
+                                   ################################################## 
+
+# Associate library sets with nominal conditions # 
+update_nominal_condition -name on -library_set lib_wc
+
+# Update isolation the rules # 
+# update_isolation_rules -names iso_mult -location to -cells { ISO_FENCE0N_X1 ISO_FENCE0N_X2 ISO_FENCE0N_X4 }
+update_isolation_rules -names iso_mult -cells { ISO_FENCE0N_X1 ISO_FENCE0N_X2 ISO_FENCE0N_X4 }
+update_isolation_rules -names iso_div -cells { ISO_FENCE0N_X1 ISO_FENCE0N_X2 ISO_FENCE0N_X4 }
+
+# Update powerswitch rules # 
+update_power_switch_rule -name psr_mult -prefix CPF_PS_ -cells { HEADER_X1 HEADER_X2 HEADER_X4 }
+update_power_switch_rule -name psr_div -prefix CPF_PS_ -cells { HEADER_X1 HEADER_X2 HEADER_X4 }
+
+# Specify timing constraints # 
+update_power_mode -name PM1 -sdc_files $SDC_DIR/alu.sdc 
+#update_power_mode -name PM1 -activity_file $SDC_DIR/cg_pso.tcf -activity_file_weight 100
+
+# Describing power nets # 
+create_global_connection -domain PD_default -net TVDD -pins VDD 
+create_global_connection -domain PD_default -net VSS -pins VSS  
+create_global_connection -domain PD_mult  -net VDD -pins VDD 
+create_global_connection -domain PD_mult -net VSS -pins VSS
+create_global_connection -domain PD_div  -net VDD -pins VDD 
+create_global_connection -domain PD_div -net VSS -pins VSS
+
+# update Power Domain # 
+update_power_domain -name PD_default -internal_power_net TVDD 
+update_power_domain -name PD_mult -internal_power_net VDD
+update_power_domain -name PD_div -internal_power_net VDD 
+
+end_design 
+
+# END # 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
